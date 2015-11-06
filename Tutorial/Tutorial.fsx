@@ -2,21 +2,15 @@
 // Reference F# Compiler Service and F# Formatting
 // ----------------------------------------------------------------------------
 
-#I "../packages/FSharp.Compiler.Service.0.0.67/lib/net40"
-#I "../packages/FSharp.Formatting.2.4.36/lib/net40"
-#I "../packages/RazorEngine.3.3.0/lib/net40/"
-#r "../packages/Microsoft.AspNet.Razor.2.0.30506.0/lib/net40/System.Web.Razor.dll"
-#r "FSharp.Compiler.Service.dll"
-#r "RazorEngine.dll"
-#r "FSharp.Markdown.dll"
-#r "FSharp.Literate.dll"
-#r "FSharp.CodeFormat.dll"
-#r "FSharp.MetadataFormat.dll"
+#r "../packages/FSharp.Compiler.Service/lib/net45/FSharp.Compiler.Service.dll"
+#load "../paket-files/matthid/Yaaf.FSharp.Scripting/src/source/Yaaf.FSharp.Scripting/YaafFSharpScripting.fs"
+#load "../packages/FSharp.Formatting/FSharp.Formatting.fsx"
 open System.IO
 open System.Text
 open FSharp.Literate
 open FSharp.Markdown
 open FSharp.CodeFormat
+open Yaaf.FSharp.Scripting
 open Microsoft.FSharp.Compiler.Interactive.Shell
 
 // ----------------------------------------------------------------------------
@@ -109,28 +103,7 @@ type PerfTest =
 // embedded F# interactive. Here is the 'Evaluator'
 // helper from the previous demos:
 
-type Evaluator() = 
-    // Intialize output and input streams
-    let sbOut = new StringBuilder()
-    let sbErr = new StringBuilder()
-    let inStream = new StringReader("")
-    let outStream = new StringWriter(sbOut)
-    let errStream = new StringWriter(sbErr)
-
-    // Build command line arguments & start FSI session
-    let argv = [| "C:\\fsi.exe" |]
-    let allArgs = Array.append argv [|"--noninteractive"; "--optimize+"|]
-
-    let fsiConfig = FsiEvaluationSession.GetDefaultConfiguration()
-    let fsiSession = FsiEvaluationSession.Create(fsiConfig, allArgs, inStream, outStream, errStream)  
-
-    member __.EvalExpression text =
-      match fsiSession.EvalExpression(text) with
-      | Some value -> value.ReflectionValue
-      | None -> failwith "Got no result!"
-
-    member __.EvalInteraction text =
-      fsiSession.EvalInteraction(text) 
+let internal fsiSession = ScriptHost.Create(FsiOptions.Default, preventStdOut=true)
 
 // To see how you can evaluate the performance, 
 // let's create a sample silly "PerfTest" instance:
@@ -144,13 +117,12 @@ let test =
 // runs a statement (such as function definition) and does
 // not return any result - we can use this to define the 
 // function we want to test before evaluating it:
-let eval = Evaluator()
-eval.EvalInteraction(test.Body)
+fsiSession.EvalInteraction(test.Body)
 
 // Once we have this, we can run the expression 
 // e.g. "test()" and measure how long it takes
 let sw = System.Diagnostics.Stopwatch.StartNew()
-eval.EvalExpression(test.Run) |> ignore
+fsiSession.EvalExpression<unit>(test.Run)
 printfn "Evaluated in: %d ms" sw.ElapsedMilliseconds
 
 // ----------------------------------------------------------------------------
